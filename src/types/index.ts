@@ -65,3 +65,57 @@ export interface TeamAnalysis {
 }
 
 export type FilterType = PokemonType | "all";
+
+/** Shape of what we write to localStorage. */
+export interface PersistedState {
+  gameKey: string | null;
+  /** 6-slot array — each element is a Pokémon ID or null to preserve slot positions. */
+  teamSlots: (number | null)[];
+}
+
+/** Per-type defensive multiplier for a single Pokémon. */
+export type DefensiveChart = Record<PokemonType, number>;
+
+/** A single base stat with display metadata. */
+export interface StatEntry {
+  key: keyof BaseStats;
+  label: string;
+  value: number;
+  /** 0–1 fill ratio, normalised against the practical max (255). */
+  fill: number;
+  color: string;
+}
+
+// ── Game-specific detail types ────────────────────────────────────────────────
+
+export type ObtainMethod =
+  | "starter"
+  | "wild"
+  | "evolve"
+  | "trade"
+  | "gift"
+  | "fossil"
+  | "safari"
+  | "legendary"
+  | "mythical";
+
+export interface LevelUpMove {
+  level: number;
+  name: string;
+}
+
+export interface GamePokemonMoves {
+  levelUp: LevelUpMove[];
+  tm: string[];
+  tutor: string[];
+}
+
+export interface GamePokemonDetails {
+  obtainMethods: ObtainMethod[];
+  locations: string[];
+  notes?: string;
+  moves: GamePokemonMoves;
+}
+
+/** Full game detail file shape — keyed by Pokémon slug (e.g. "charizard"). */
+export type GameDetailData = Record<string, GamePokemonDetails>;

@@ -1,4 +1,4 @@
-import type { PokemonType } from "@/types";
+import type { Pokemon, PokemonType } from "@/types";
 
 export function getPokemonImageUrl(id: number): string {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
@@ -41,6 +41,25 @@ export function formatStatName(key: string): string {
     speed: "Spd",
   };
   return map[key] ?? key;
+}
+
+/**
+ * Converts a Pokémon name to a URL-safe slug.
+ * "Mr. Mime" → "mr-mime", "Farfetch'd" → "farfetch-d", "Ho-Oh" → "ho-oh"
+ */
+export function toPokemonSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/** Finds a Pokémon in the roster by matching its slug against the URL param. */
+export function pokemonFromSlug(
+  slug: string,
+  roster: Pokemon[]
+): Pokemon | undefined {
+  return roster.find((p) => toPokemonSlug(p.name) === slug);
 }
 
 export function getTotalBST(baseStats: {
