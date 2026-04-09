@@ -1,5 +1,4 @@
 import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPokemonImageUrl, TYPE_COLORS } from "@/lib/pokemon";
 import { useAppContext } from "@/context/AppContext";
@@ -16,7 +15,7 @@ export function TeamSlot({ index, pokemon }: TeamSlotProps) {
 
   if (!pokemon) {
     return (
-      <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed bg-muted/30 p-2 h-24">
+      <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed bg-muted/30 p-2 min-h-24">
         <div className="h-10 w-10 rounded-full border border-dashed border-muted-foreground/30 bg-muted/50" />
         <span className="text-[10px] text-muted-foreground">Empty</span>
       </div>
@@ -24,12 +23,12 @@ export function TeamSlot({ index, pokemon }: TeamSlotProps) {
   }
 
   return (
-    <div className="group relative flex flex-col items-center gap-1 rounded-lg border bg-card p-2 h-24 transition-colors hover:border-destructive/40">
+    <div className="group relative flex flex-col items-center gap-1 rounded-lg border bg-card p-2 min-h-24 transition-colors hover:border-destructive/40">
       <button
         onClick={() => removeFromTeam(index)}
         title={`Remove ${pokemon.name}`}
         className={cn(
-          "absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full",
+          "absolute right-0.5 top-0.5 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full",
           "bg-muted/80 text-muted-foreground transition-colors",
           "hover:bg-destructive hover:text-destructive-foreground",
           // Always visible on touch screens; fade in on pointer devices

@@ -29,6 +29,8 @@ export interface BaseStats {
 
 export interface Pokemon {
   id: number;
+  /** Regional dex number for the loaded game (e.g. Johto #001 for Chikorita in HG/SS). Absent when Pokémon is referenced outside a game context. */
+  dexNumber?: number;
   name: string;
   types: [PokemonType] | [PokemonType, PokemonType];
   baseStats: BaseStats;
@@ -119,3 +121,14 @@ export interface GamePokemonDetails {
 
 /** Full game detail file shape — keyed by Pokémon slug (e.g. "charizard"). */
 export type GameDetailData = Record<string, GamePokemonDetails>;
+
+// ── Auth types ────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  avatarUrl?: string;
+}
+
+export type AuthTab = "signin" | "signup";

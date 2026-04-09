@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/select";
 import { useAppContext } from "@/context/AppContext";
 
+const AVAILABLE_GAMES = new Set(["firered", "heartgold"]);
+
 export function GameSelector() {
   const { games, selectedGame, selectGame } = useAppContext();
 
@@ -23,11 +25,20 @@ export function GameSelector() {
           <SelectValue placeholder="Choose a Pokémon game…" />
         </SelectTrigger>
         <SelectContent>
-          {games.map((game) => (
-            <SelectItem key={game.key} value={game.key}>
-              {game.name}
-            </SelectItem>
-          ))}
+          {games.map((game) => {
+            const available = AVAILABLE_GAMES.has(game.key);
+            return (
+              <SelectItem
+                key={game.key}
+                value={game.key}
+                disabled={!available}
+                className={!available ? "opacity-40" : ""}
+              >
+                {game.name}
+                {!available && " (coming soon)"}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>

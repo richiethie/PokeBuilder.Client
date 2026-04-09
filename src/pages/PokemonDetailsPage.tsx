@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
-  ArrowLeft, Plus, Check,
+  ArrowLeft, Plus, X,
   MapPin, Zap, Gift, RefreshCw, Leaf, ArrowLeftRight,
   BookOpen, TreePine, Star, Sparkles,
 } from "lucide-react";
@@ -12,25 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatBar } from "@/features/pokemon-details/StatBar";
 import { TypeMatchupGrid } from "@/features/pokemon-details/TypeMatchupGrid";
 import { useAppContext } from "@/context/AppContext";
+import { gamesService } from "@/lib/api";
+import type { PokemonDetailResponse, PokemonDetailGameInfo } from "@/lib/api";
 import {
   getPokemonImageUrl,
   TYPE_COLORS,
   formatStatName,
-  pokemonFromSlug,
 } from "@/lib/pokemon";
 import { cn } from "@/lib/utils";
-import type {
-  GameDetailData,
-  GamePokemonDetails,
-  ObtainMethod,
-  StatEntry,
-} from "@/types";
-import allPokemonData from "@/data/pokemon.json";
-import gamesData from "@/data/games.json";
-import type { Pokemon, Game } from "@/types";
-
-const allPokemon = allPokemonData as Pokemon[];
-const allGames = gamesData as Game[];
+import type { ObtainMethod, StatEntry } from "@/types";
 
 const STAT_MAX = 255;
 const STAT_COLORS: Record<string, string> = {
@@ -68,7 +58,7 @@ function NotFoundPage({ message }: { message: string }) {
   );
 }
 
-function AcquisitionSection({ details }: { details: GamePokemonDetails }) {
+function AcquisitionSection({ details }: { details: PokemonDetailGameInfo }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold">How to Get</h2>
@@ -109,7 +99,7 @@ function AcquisitionSection({ details }: { details: GamePokemonDetails }) {
   );
 }
 
-function MovesSection({ details }: { details: GamePokemonDetails }) {
+function MovesSection({ details }: { details: PokemonDetailGameInfo }) {
   const { levelUp, tm, tutor } = details.moves;
 
   return (
@@ -198,29 +188,39 @@ export function PokemonDetailsPage() {
     pokemon: string;
   }>();
   const navigate = useNavigate();
-  const { addToTeam, removeFromTeam, isOnTeam, team } = useAppContext();
+  const { games, addToTeam, removeFromTeam, isOnTeam, team } = useAppContext();
 
-  const [gameDetails, setGameDetails] = useState<GameDetailData | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(true);
-
-  const game = allGames.find((g) => g.key === gameParam);
-  const pokemon = pokemonParam
-    ? pokemonFromSlug(pokemonParam, allPokemon)
-    : undefined;
+  const [detail, setDetail] = useState<PokemonDetailResponse | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!gameParam) return;
-    setLoadingDetails(true);
-    import(`@/data/gameDetails/${gameParam}.json`)
-      .then((m) => setGameDetails(m.default as GameDetailData))
-      .catch(() => setGameDetails(null))
-      .finally(() => setLoadingDetails(false));
-  }, [gameParam]);
+    if (!gameParam || !pokemonParam) return;
+    setLoadingDetail(true);
+    setNotFound(false);
+    gamesService
+      .getPokemonDetail(gameParam, pokemonParam)
+      .then(setDetail)
+      .catch(() => setNotFound(true))
+      .finally(() => setLoadingDetail(false));
+  }, [gameParam, pokemonParam]);
 
-  if (!game) return <NotFoundPage message={`Game "${gameParam}" not found.`} />;
-  if (!pokemon) return <NotFoundPage message={`Pokémon "${pokemonParam}" not found.`} />;
+  // Use the game name from context (games loads async, falls back gracefully)
+  const game = games.find((g) => g.key === gameParam);
 
-  const details: GamePokemonDetails | undefined = gameDetails?.[pokemonParam!];
+  if (notFound)
+    return <NotFoundPage message={`Pokémon "${pokemonParam}" not found in ${gameParam}.`} />;
+
+  if (loadingDetail || !detail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  const pokemon = detail;
+  const details = detail.gameInfo;
 
   const onTeam = isOnTeam(pokemon.id);
   const teamFull = team.every((s) => s !== null);
@@ -256,7 +256,7 @@ export function PokemonDetailsPage() {
         </Button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{pokemon.name}</p>
-          <p className="text-xs text-muted-foreground">{game.name}</p>
+          <p className="text-xs text-muted-foreground">{game?.name ?? gameParam}</p>
         </div>
         {onTeam ? (
           <Button
@@ -289,9 +289,17 @@ export function PokemonDetailsPage() {
             className="h-40 w-40 object-contain drop-shadow-xl"
           />
           <div className="flex flex-col items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">
-              #{String(pokemon.id).padStart(3, "0")}
-            </span>
+            {pokemon.dexNumber !== undefined && pokemon.dexNumber !== pokemon.id ? (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>Regional #{String(pokemon.dexNumber).padStart(3, "0")}</span>
+                <span className="opacity-40">·</span>
+                <span>National #{String(pokemon.id).padStart(3, "0")}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                #{String(pokemon.dexNumber ?? pokemon.id).padStart(3, "0")}
+              </span>
+            )}
             <h1 className="text-2xl font-bold">{pokemon.name}</h1>
             <div className="flex gap-2">
               {pokemon.types.map((type) => (
@@ -334,11 +342,7 @@ export function PokemonDetailsPage() {
         <Separator />
 
         {/* Game-specific data */}
-        {loadingDetails ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            Loading game data…
-          </p>
-        ) : details ? (
+        {details ? (
           <>
             <AcquisitionSection details={details} />
             <Separator />
@@ -347,7 +351,7 @@ export function PokemonDetailsPage() {
         ) : (
           <div className="rounded-lg border border-dashed px-4 py-6 text-center">
             <p className="text-sm font-medium text-muted-foreground">
-              No game-specific data available for {pokemon.name} in {game.name} yet.
+              No game-specific data available for {pokemon.name} in {game?.name ?? gameParam} yet.
             </p>
           </div>
         )}

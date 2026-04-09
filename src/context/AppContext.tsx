@@ -9,27 +9,29 @@ import {
   type ReactNode,
 } from "react";
 import type { Pokemon, Game, FilterType } from "@/types";
-import allPokemonData from "@/data/pokemon.json";
-import gamesData from "@/data/games.json";
+import { gamesService } from "@/lib/api";
 import { storage } from "@/lib/storage";
 
 const MAX_TEAM_SIZE = 6;
 
-const allPokemon = allPokemonData as Pokemon[];
-const games = gamesData as Game[];
-
-function rehydrateTeam(slots: (number | null)[]): (Pokemon | null)[] {
-  return slots.map((id) =>
-    id === null ? null : (allPokemon.find((p) => p.id === id) ?? null)
-  );
+export interface ActiveSavedTeam {
+  id: string;
+  name: string;
+  /** Name at load time — used to detect renames. */
+  originalName: string;
+  /** Slot IDs at load time — used to detect changes. */
+  originalPokemonIds: (number | null)[];
 }
 
 interface AppContextValue {
   games: Game[];
   selectedGame: Game | null;
-  selectGame: (key: string, preserveTeam?: boolean) => Promise<void>;
+  selectGame: (key: string, preserveTeam?: boolean, teamIds?: (number | null)[]) => Promise<void>;
+  /** True while the app is restoring a previously saved game from localStorage. */
+  isHydrating: boolean;
 
   dexPokemon: Pokemon[];
+  isDexLoading: boolean;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   typeFilter: FilterType;
@@ -41,54 +43,129 @@ interface AppContextValue {
   removeFromTeam: (slotIndex: number) => void;
   isOnTeam: (id: number) => boolean;
   teamPokemon: Pokemon[];
+
+  /** Load a team directly from IDs using the already-loaded dex (no re-fetch). */
+  loadTeamFromIds: (ids: (number | null)[]) => void;
+  /** Clear all team slots and decouple from any active saved team. */
+  clearTeam: () => void;
+  /** Non-null when the current team was loaded from a saved team for editing. */
+  activeSavedTeam: ActiveSavedTeam | null;
+  setActiveSavedTeam: (v: ActiveSavedTeam | null) => void;
+  setActiveSavedTeamName: (name: string) => void;
+  /** True when the team or name differs from the saved snapshot. */
+  isTeamDirty: boolean;
+
+  teamSheetOpen: boolean;
+  setTeamSheetOpen: (v: boolean) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [dexIds, setDexIds] = useState<number[]>([]);
+  const [dexPokemon, setDexPokemon] = useState<Pokemon[]>([]);
+  const [isDexLoading, setIsDexLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
-
-  const [team, setTeam] = useState<(Pokemon | null)[]>(() =>
-    rehydrateTeam(storage.getTeam())
+  const [team, setTeam] = useState<(Pokemon | null)[]>(
+    Array(MAX_TEAM_SIZE).fill(null)
   );
+
+  // True while restoring a saved game session — prevents flashing the welcome hero
+  const [isHydrating, setIsHydrating] = useState<boolean>(
+    () => !!storage.getGame()
+  );
+  const [activeSavedTeam, setActiveSavedTeam] = useState<ActiveSavedTeam | null>(null);
+  const [teamSheetOpen, setTeamSheetOpen] = useState(false);
 
   const isHydrated = useRef(false);
 
+  const setActiveSavedTeamName = useCallback((name: string) => {
+    setActiveSavedTeam((prev) => (prev ? { ...prev, name } : null));
+  }, []);
+
+  const isTeamDirty = useMemo(() => {
+    if (!activeSavedTeam) return false;
+    const currentIds = team.map((p) => p?.id ?? null);
+    return (
+      activeSavedTeam.name !== activeSavedTeam.originalName ||
+      !currentIds.every((id, i) => id === activeSavedTeam.originalPokemonIds[i])
+    );
+  }, [activeSavedTeam, team]);
+
+  // Load games list from API on mount
+  useEffect(() => {
+    gamesService.getGames().then(setGames).catch(() => setGames([]));
+  }, []);
+
   const selectGame = useCallback(
-    async (key: string, preserveTeam = false) => {
-      const game = games.find((g) => g.key === key) ?? null;
-      setSelectedGame(game);
+    async (key: string, preserveTeam = false, teamIds?: (number | null)[]) => {
+      setIsDexLoading(true);
+      setSearchQuery("");
+      setTypeFilter("all");
 
       if (!preserveTeam) {
         setTeam(Array(MAX_TEAM_SIZE).fill(null));
-        setSearchQuery("");
-        setTypeFilter("all");
       }
 
-      if (!game) {
-        setDexIds([]);
-        return;
+      if (!teamIds) {
+        setActiveSavedTeam(null);
       }
 
       try {
-        const module = await import(`@/data/gameDexes/${key}.json`);
-        setDexIds(module.default as number[]);
+        // Fetch game meta and dex simultaneously
+        const [allGames, dex] = await Promise.all([
+          games.length > 0 ? Promise.resolve(games) : gamesService.getGames(),
+          gamesService.getDex(key),
+        ]);
+
+        const game = allGames.find((g) => g.key === key) ?? null;
+        setSelectedGame(game);
+
+        // If allGames was freshly fetched, keep it in sync
+        if (games.length === 0 && allGames.length > 0) {
+          setGames(allGames);
+        }
+
+        setDexPokemon(dex);
+
+        if (teamIds) {
+          // Explicit IDs provided (e.g. loading a saved team for editing)
+          setTeam(
+            teamIds.map((id) =>
+              id === null ? null : (dex.find((p) => p.id === id) ?? null)
+            )
+          );
+        } else if (preserveTeam) {
+          const savedSlots = storage.getTeam();
+          setTeam(
+            savedSlots.map((id) =>
+              id === null ? null : (dex.find((p) => p.id === id) ?? null)
+            )
+          );
+        }
       } catch {
-        setDexIds([]);
+        setSelectedGame(null);
+        setDexPokemon([]);
+      } finally {
+        setIsDexLoading(false);
       }
     },
-    []
+    [games]
   );
 
   // Restore game from localStorage on mount
   useEffect(() => {
     const savedKey = storage.getGame();
-    if (savedKey) void selectGame(savedKey, true);
+    if (savedKey) {
+      void selectGame(savedKey, true).finally(() => setIsHydrating(false));
+    } else {
+      setIsHydrating(false);
+    }
     isHydrated.current = true;
-  }, [selectGame]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once — selectGame stable after games loads
 
   // Persist game changes
   useEffect(() => {
@@ -101,14 +178,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     storage.setTeam(team.map((p) => p?.id ?? null));
   }, [team]);
-
-  const dexPokemon = useMemo(
-    () =>
-      dexIds
-        .map((id) => allPokemon.find((p) => p.id === id))
-        .filter((p): p is Pokemon => p !== undefined),
-    [dexIds]
-  );
 
   const filteredPokemon = useMemo(
     () =>
@@ -147,6 +216,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [isOnTeam]
   );
 
+  const loadTeamFromIds = useCallback(
+    (ids: (number | null)[]) => {
+      setTeam(
+        ids.map((id) =>
+          id === null ? null : (dexPokemon.find((p) => p.id === id) ?? null)
+        )
+      );
+    },
+    [dexPokemon]
+  );
+
+  const clearTeam = useCallback(() => {
+    setTeam(Array(MAX_TEAM_SIZE).fill(null));
+    setActiveSavedTeam(null);
+  }, []);
+
   const removeFromTeam = useCallback((slotIndex: number) => {
     setTeam((prev) => {
       const next = [...prev];
@@ -159,7 +244,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     games,
     selectedGame,
     selectGame,
+    isHydrating,
     dexPokemon,
+    isDexLoading,
     searchQuery,
     setSearchQuery,
     typeFilter,
@@ -170,6 +257,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeFromTeam,
     isOnTeam,
     teamPokemon,
+    loadTeamFromIds,
+    clearTeam,
+    activeSavedTeam,
+    setActiveSavedTeam,
+    setActiveSavedTeamName,
+    isTeamDirty,
+    teamSheetOpen,
+    setTeamSheetOpen,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

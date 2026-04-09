@@ -51,7 +51,12 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
           <span className="text-xs text-muted-foreground">
-            #{String(pokemon.id).padStart(3, "0")}
+            #{String(pokemon.dexNumber ?? pokemon.id).padStart(3, "0")}
+            {pokemon.dexNumber !== undefined && pokemon.dexNumber !== pokemon.id && (
+              <span className="opacity-50">
+                {" · "}#{String(pokemon.id).padStart(3, "0")}
+              </span>
+            )}
           </span>
           <span className="truncate text-sm font-semibold">{pokemon.name}</span>
         </div>
