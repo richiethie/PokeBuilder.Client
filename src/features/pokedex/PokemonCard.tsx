@@ -43,8 +43,10 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
         <img
           src={getPokemonImageUrl(pokemon.id)}
           alt={pokemon.name}
-          className="h-full w-full object-contain drop-shadow-sm"
+          className="h-full w-full object-contain drop-shadow-sm transition-opacity duration-300"
           loading="lazy"
+          style={{ opacity: 0 }}
+          onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
         />
       </div>
 

@@ -1,9 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useRef, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useRef, useEffect } from "react";
 import { AppProvider, useAppContext } from "@/context/AppContext";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AuthModal } from "@/features/auth/AuthModal";
 import { AppHeader } from "@/components/AppHeader";
 import { GameSelector } from "@/features/pokedex/GameSelector";
@@ -18,36 +16,6 @@ import { ProfilePage } from "@/pages/ProfilePage";
 import { SavedTeamPage } from "@/pages/SavedTeamPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
-// ── Loading overlay — covers the screen while session/dex is restoring ────────
-
-function AppLoadingOverlay() {
-  const { isHydrating } = useAppContext();
-  const [visible, setVisible] = useState(true);
-  const [opacity, setOpacity] = useState(1);
-
-  useEffect(() => {
-    if (isHydrating) return;
-    // Hydration finished — fade out, then unmount
-    setOpacity(0);
-    const t = setTimeout(() => setVisible(false), 450);
-    return () => clearTimeout(t);
-  }, [isHydrating]);
-
-  if (!visible) return null;
-
-  return (
-    <div
-      style={{ opacity, transition: "opacity 450ms ease" }}
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background"
-    >
-      <div className="flex flex-col items-center gap-5">
-        <p className="text-2xl font-bold tracking-tight">PokéBuilder</p>
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 interface EditTeamState {
@@ -59,6 +27,7 @@ interface EditTeamState {
 
 function MainPage() {
   const { selectedGame, isHydrating, selectGame, setActiveSavedTeam, setTeamSheetOpen } = useAppContext();
+  const { isAuthHydrating } = useAuth();
   const location = useLocation();
   const editHandled = useRef(false);
 
@@ -82,13 +51,32 @@ function MainPage() {
     }
   }, [isHydrating, location.state, selectGame, setActiveSavedTeam, setTeamSheetOpen]);
 
+  const loading = isHydrating || isAuthHydrating;
+
+  // Remove the HTML splash screen once both contexts are done hydrating AND
+  // the browser has painted the full UI beneath it.
+  useEffect(() => {
+    if (loading) return;
+    // Wait two animation frames: the first lets React commit the DOM,
+    // the second ensures the browser has actually painted pixels.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const splash = document.getElementById("app-splash");
+        if (splash) {
+          splash.style.transition = "opacity 400ms ease";
+          splash.style.opacity = "0";
+          setTimeout(() => splash.remove(), 400);
+        }
+      });
+    });
+  }, [loading]);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
 
       <main className="flex-1">
-        {/* During session restore, render nothing (avoids flashing the hero) */}
-        {isHydrating ? null : !selectedGame ? (
+        {!selectedGame ? (
           <WelcomeHero />
         ) : (
           <div className="mx-auto w-full max-w-5xl px-4 py-4 pb-24 lg:pb-4">
@@ -123,7 +111,6 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
-          <AppLoadingOverlay />
           <Routes>
             <Route path="/" element={<MainPage />} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

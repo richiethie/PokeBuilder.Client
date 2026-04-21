@@ -80,48 +80,63 @@ export function computeDefensiveWeaknesses(
 }
 
 /**
- * Computes a simple team rating from 0-100.
+ * Computes a team rating from 0-100.
  *
- * Factors:
- *  - Type diversity (unique types on team / 12 possible, capped)
- *  - BST average normalized to 600
- *  - Coverage score (how many of 18 types can be hit super-effectively)
- *  - Weakness penalty (types that hit 4+ members)
+ * Factors (sum to 100 before penalty):
+ *  - Type diversity: unique types on the team (6 types = full marks)
+ *  - BST average: normalized to 480 (easily reachable by mid-tier Pokémon)
+ *  - Offensive coverage: how many of 18 types can be hit super-effectively
+ *  - Defensive balance: reward types the team resists, not just penalize weaknesses
+ *  - Weakness penalty: shared weaknesses (3+ members hit)
  */
 export function computeTeamRating(team: Pokemon[]): number {
   if (team.length === 0) return 0;
 
+  // ── Type diversity (0–20) ───────────────────────────────────────────────
+  // 6 Pokémon with dual types can have at most 12 unique types;
+  // 6 is a realistic "good" number for a balanced team.
   const uniqueTypes = new Set<PokemonType>(team.flatMap((p) => p.types));
-  const typeDiversityScore = Math.min(uniqueTypes.size / 10, 1) * 30;
+  const typeDiversityScore = Math.min(uniqueTypes.size / 6, 1) * 20;
 
+  // ── BST average (0–20) ─────────────────────────────────────────────────
+  // 480 is the average for fully-evolved non-legendary Pokémon.
   const avgBST =
     team.reduce((sum, p) => sum + getTotalBST(p.baseStats), 0) / team.length;
-  const bstScore = Math.min(avgBST / 550, 1) * 30;
+  const bstScore = Math.min(avgBST / 480, 1) * 20;
 
+  // ── Offensive coverage (0–30) ──────────────────────────────────────────
   const teamTypes = new Set<PokemonType>(team.flatMap((p) => p.types));
   const coveredTypes = ALL_TYPES.filter((defType) =>
     Array.from(teamTypes).some(
       (attType) => (typeChart[attType][defType] ?? 1) > 1
     )
   ).length;
-  const coverageScore = (coveredTypes / 18) * 25;
+  const coverageScore = (coveredTypes / 18) * 30;
 
+  // ── Defensive balance (0–20) ───────────────────────────────────────────
+  // For each attacking type, check if at least one team member resists it (<1x).
+  const resistedTypes = ALL_TYPES.filter((attType) =>
+    team.some((p) => getDefensiveMultiplier(attType, p) < 1)
+  ).length;
+  const defenseScore = (resistedTypes / 18) * 20;
+
+  // ── Weakness penalty (0–10) ────────────────────────────────────────────
   const weaknesses = computeDefensiveWeaknesses(team);
   const severeWeaknesses = weaknesses.filter(
     (w) => w.affectedPokemon.length >= 3
   ).length;
-  const weaknessPenalty = Math.min(severeWeaknesses * 5, 15);
+  const weaknessPenalty = Math.min(severeWeaknesses * 3, 10);
 
   const raw =
-    typeDiversityScore + bstScore + coverageScore - weaknessPenalty;
+    typeDiversityScore + bstScore + coverageScore + defenseScore - weaknessPenalty;
 
   return Math.round(Math.max(0, Math.min(100, raw)));
 }
 
 export function getRatingLabel(score: number): string {
-  if (score >= 80) return "Excellent";
-  if (score >= 65) return "Strong";
-  if (score >= 50) return "Decent";
+  if (score >= 90) return "Excellent";
+  if (score >= 75) return "Strong";
+  if (score >= 55) return "Decent";
   if (score >= 35) return "Needs Work";
   return "Weak";
 }

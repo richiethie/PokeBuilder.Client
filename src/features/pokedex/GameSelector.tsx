@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import { useAppContext } from "@/context/AppContext";
 
-const AVAILABLE_GAMES = new Set(["firered", "heartgold"]);
+const AVAILABLE_GAMES = new Set(["firered", "heartgold", "emerald", "blackwhite", "platinum"]);
 
 export function GameSelector() {
   const { games, selectedGame, selectGame } = useAppContext();

@@ -94,10 +94,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, [activeSavedTeam, team]);
 
-  // Load games list from API on mount
-  useEffect(() => {
-    gamesService.getGames().then(setGames).catch(() => setGames([]));
-  }, []);
+  const gamesRef = useRef(games);
+  gamesRef.current = games;
 
   const selectGame = useCallback(
     async (key: string, preserveTeam = false, teamIds?: (number | null)[]) => {
@@ -114,24 +112,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Fetch game meta and dex simultaneously
+        const cached = gamesRef.current;
         const [allGames, dex] = await Promise.all([
-          games.length > 0 ? Promise.resolve(games) : gamesService.getGames(),
+          cached.length > 0 ? Promise.resolve(cached) : gamesService.getGames(),
           gamesService.getDex(key),
         ]);
 
         const game = allGames.find((g) => g.key === key) ?? null;
         setSelectedGame(game);
 
-        // If allGames was freshly fetched, keep it in sync
-        if (games.length === 0 && allGames.length > 0) {
+        if (cached.length === 0 && allGames.length > 0) {
           setGames(allGames);
         }
 
         setDexPokemon(dex);
 
         if (teamIds) {
-          // Explicit IDs provided (e.g. loading a saved team for editing)
           setTeam(
             teamIds.map((id) =>
               id === null ? null : (dex.find((p) => p.id === id) ?? null)
@@ -152,20 +148,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsDexLoading(false);
       }
     },
-    [games]
+    [] // stable — reads games via ref
   );
 
-  // Restore game from localStorage on mount
+  // Hydrate everything on mount: games list + saved game + saved team.
+  // This is one atomic operation — isHydrating stays true until everything resolves.
   useEffect(() => {
-    const savedKey = storage.getGame();
-    if (savedKey) {
-      void selectGame(savedKey, true).finally(() => setIsHydrating(false));
-    } else {
-      setIsHydrating(false);
+    let cancelled = false;
+    async function hydrate() {
+      try {
+        const allGames = await gamesService.getGames();
+        if (cancelled) return;
+        setGames(allGames);
+
+        const savedKey = storage.getGame();
+        if (savedKey) {
+          const dex = await gamesService.getDex(savedKey);
+          if (cancelled) return;
+
+          const game = allGames.find((g) => g.key === savedKey) ?? null;
+          setSelectedGame(game);
+          setDexPokemon(dex);
+
+          const savedSlots = storage.getTeam();
+          setTeam(
+            savedSlots.map((id) =>
+              id === null ? null : (dex.find((p) => p.id === id) ?? null)
+            )
+          );
+        }
+      } catch {
+        // If hydration fails, just start fresh
+      } finally {
+        if (!cancelled) {
+          isHydrated.current = true;
+          setIsHydrating(false);
+        }
+      }
     }
-    isHydrated.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once — selectGame stable after games loads
+    hydrate();
+    return () => { cancelled = true; };
+  }, []);
 
   // Persist game changes
   useEffect(() => {
