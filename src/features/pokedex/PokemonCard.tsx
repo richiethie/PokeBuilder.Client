@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getPokemonImageUrl, TYPE_COLORS, toPokemonSlug } from "@/lib/pokemon";
-import { useAppContext } from "@/context/AppContext";
+import { FULL_POKEDEX_KEY, useAppContext } from "@/context/AppContext";
 import type { Pokemon } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +19,12 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
   const teamSlotIndex = team.findIndex((slot) => slot?.id === pokemon.id);
   const teamFull = team.every((slot) => slot !== null);
   const disabled = !onTeam && teamFull;
+  const nameLength = pokemon.name.length;
+  const nameSizeClass =
+    nameLength >= 20 ? "text-[10px]" : nameLength >= 14 ? "text-[13px]" : "text-sm";
 
   function handleCardClick() {
-    if (selectedGame) {
+    if (selectedGame && selectedGame.key !== FULL_POKEDEX_KEY) {
       navigate(`/${selectedGame.key}/${toPokemonSlug(pokemon.name)}`);
     }
   }
@@ -61,7 +64,9 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
               </span>
             )}
           </span>
-          <span className="truncate text-sm font-semibold">{pokemon.name}</span>
+          <span className={cn("truncate font-semibold leading-tight", nameSizeClass)}>
+            {pokemon.name}
+          </span>
         </div>
         <div className="mt-1 flex flex-wrap gap-1">
           {pokemon.types.map((type) => (

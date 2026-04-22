@@ -213,7 +213,7 @@ export function SavedTeamPage() {
     setDeleting(true);
     try {
       await teamsService.delete(savedTeam.id);
-      navigate("/profile", { replace: true });
+      navigate("/teams", { replace: true });
     } catch {
       setDeleting(false);
     }
@@ -248,7 +248,7 @@ export function SavedTeamPage() {
           className="flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Profile
+          Back
         </button>
 
         {/* Team header */}

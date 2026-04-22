@@ -15,6 +15,8 @@ import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { teamsService } from "@/lib/api";
 import { getErrorMessage } from "@/lib/api";
+import { FULL_POKEDEX_KEY } from "@/context/AppContext";
+import { setFavoriteTeam } from "@/lib/favoriteTeam";
 
 interface TeamBuilderProps {
   hideHeader?: boolean;
@@ -23,15 +25,19 @@ interface TeamBuilderProps {
 function SaveTeamDialog({
   open,
   onClose,
+  userId,
 }: {
   open: boolean;
   onClose: () => void;
+  userId: string;
 }) {
   const { team, selectedGame, setActiveSavedTeam } = useAppContext();
   const [name, setName] = useState("");
+  const [setAsFavorite, setSetAsFavorite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const canSetFavorite = selectedGame?.key === FULL_POKEDEX_KEY;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -53,10 +59,14 @@ function SaveTeamDialog({
         originalName: savedTeam.name,
         originalPokemonIds: savedTeam.pokemonIds,
       });
+      if (canSetFavorite && setAsFavorite) {
+        setFavoriteTeam(userId, pokemonIds);
+      }
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
         setName("");
+        setSetAsFavorite(false);
         onClose();
       }, 1200);
     } catch (err) {
@@ -71,6 +81,7 @@ function SaveTeamDialog({
       setName("");
       setError("");
       setSaved(false);
+      setSetAsFavorite(false);
       onClose();
     }
   }
@@ -104,6 +115,19 @@ function SaveTeamDialog({
                 maxLength={100}
               />
             </div>
+
+            {canSetFavorite && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={setAsFavorite}
+                  onChange={(e) => setSetAsFavorite(e.target.checked)}
+                  className="h-4 w-4"
+                  disabled={saving}
+                />
+                Set as favorite team
+              </label>
+            )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -265,10 +289,13 @@ export function TeamBuilder({ hideHeader = false }: TeamBuilderProps) {
         </>
       )}
 
-      <SaveTeamDialog
-        open={saveDialogOpen}
-        onClose={() => setSaveDialogOpen(false)}
-      />
+      {user && (
+        <SaveTeamDialog
+          open={saveDialogOpen}
+          onClose={() => setSaveDialogOpen(false)}
+          userId={user.id}
+        />
+      )}
     </div>
   );
 }

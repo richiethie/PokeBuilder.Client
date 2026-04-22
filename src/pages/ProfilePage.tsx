@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, User, Users, Shield, Trash2, Loader2, Check } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Shield, Trash2, Loader2, Check, Star, Pencil, X } from "lucide-react";
 import type { User as UserType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -25,14 +24,83 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
-import { usersService, teamsService, getErrorMessage } from "@/lib/api";
-import type { SavedTeam } from "@/lib/api";
+import { usersService, getErrorMessage } from "@/lib/api";
+import { FULL_POKEDEX_KEY } from "@/context/AppContext";
 import { getPokemonImageUrl } from "@/lib/pokemon";
+import { getFavoriteTeam } from "@/lib/favoriteTeam";
 
 function getInitials(username: string) {
   return username.replace(/^@/, "").slice(0, 2).toUpperCase();
+}
+
+function FavoriteTeamCard({ userId }: { userId: string }) {
+  const navigate = useNavigate();
+  const favoriteIds = getFavoriteTeam(userId);
+  const hasFavorite = favoriteIds.some((id) => id !== null);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Star className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-base">Favorite Team</CardTitle>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() =>
+              navigate("/", {
+                state: {
+                  editFavoriteTeam: {
+                    pokemonIds: favoriteIds,
+                    gameKey: FULL_POKEDEX_KEY,
+                  },
+                },
+              })
+            }
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!hasFavorite ? (
+          <p className="text-sm text-muted-foreground">
+            No favorite team set yet. Click Edit to build one from the full Pokédex.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {favoriteIds.map((pokemonId, i) =>
+              pokemonId ? (
+              <div key={i} className="flex flex-col items-center rounded-md border bg-card p-2">
+                <img
+                  src={getPokemonImageUrl(pokemonId)}
+                  alt={`Favorite slot ${i + 1}`}
+                  className="h-10 w-10 object-contain"
+                />
+                <span className="mt-1 w-full truncate text-center text-[11px]">
+                  #{pokemonId}
+                </span>
+              </div>
+            ) : (
+              <div
+                key={i}
+                className="flex h-[76px] flex-col items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+                Empty
+              </div>
+            )
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ── Edit Profile Tab ──────────────────────────────────────────────────────────
@@ -248,126 +316,6 @@ function ChangePasswordTab() {
   );
 }
 
-// ── Saved Teams Tab ───────────────────────────────────────────────────────────
-
-function SavedTeamsTab() {
-  const [teams, setTeams] = useState<SavedTeam[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    teamsService
-      .getAll()
-      .then(setTeams)
-      .catch((err) => setError(getErrorMessage(err, "Failed to load teams.")))
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function handleDelete(id: string) {
-    setDeletingId(id);
-    try {
-      await teamsService.delete(id);
-      setTeams((prev) => prev.filter((t) => t.id !== id));
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to delete team."));
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Saved Teams</CardTitle>
-        <CardDescription>Teams you've saved across all games.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : teams.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <Users className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium">No saved teams yet</p>
-            <p className="text-xs text-muted-foreground max-w-[220px]">
-              Build a team on the main page and hit Save Team to store it here.
-            </p>
-          </div>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border">
-            {teams.map((team) => (
-              <li key={team.id} className="py-3">
-                <Link
-                  to={`/profile/teams/${team.id}`}
-                  className="flex flex-col gap-2 rounded-lg p-2 -mx-2 transition-colors hover:bg-accent/40 cursor-pointer"
-                >
-                  {/* Header row: name + delete */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <span className="text-sm font-semibold truncate">{team.name}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {team.gameKey}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {team.pokemonIds.filter(Boolean).length} / 6
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                      disabled={deletingId === team.id}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDelete(team.id);
-                      }}
-                    >
-                      {deletingId === team.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Sprite row: all 6 slots */}
-                  <div className="flex items-center gap-0.5">
-                    {Array.from({ length: 6 }).map((_, i) => {
-                      const id = team.pokemonIds[i];
-                      return id ? (
-                        <img
-                          key={i}
-                          src={getPokemonImageUrl(id)}
-                          alt={`Slot ${i + 1}`}
-                          className="h-11 w-11 object-contain drop-shadow-sm"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div
-                          key={i}
-                          className="h-11 w-11 rounded-full border border-dashed border-border/40"
-                        />
-                      );
-                    })}
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 // ── Danger Zone ───────────────────────────────────────────────────────────────
 
 function DangerZone() {
@@ -436,12 +384,9 @@ function DangerZone() {
 export function ProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // ProtectedRoute guarantees user is non-null by the time this renders.
   const currentUser = user as UserType;
-  const tabFromUrl = searchParams.get("tab");
-  const activeTab = tabFromUrl === "teams" || tabFromUrl === "security" ? tabFromUrl : "profile";
 
   return (
     <div className="min-h-screen bg-background">
@@ -469,40 +414,25 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={(next) => {
-            setSearchParams(next === "profile" ? {} : { tab: next }, { replace: true });
-          }}
-        >
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="profile" className="gap-1.5">
-              <User className="h-3.5 w-3.5" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="security" className="gap-1.5">
-              <Shield className="h-3.5 w-3.5" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="teams" className="gap-1.5">
-              Teams
-            </TabsTrigger>
-          </TabsList>
+        <FavoriteTeamCard userId={currentUser.id} />
 
-          <TabsContent value="profile" className="flex flex-col gap-4 mt-4">
-            <EditProfileTab />
-          </TabsContent>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">Profile Settings</h2>
+          <EditProfileTab />
+        </section>
 
-          <TabsContent value="security" className="flex flex-col gap-4 mt-4">
-            <ChangePasswordTab />
-            <DangerZone />
-          </TabsContent>
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5">
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-muted-foreground">Security</h2>
+          </div>
+          <ChangePasswordTab />
+        </section>
 
-          <TabsContent value="teams" className="flex flex-col gap-4 mt-4">
-            <SavedTeamsTab />
-          </TabsContent>
-        </Tabs>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">Danger Zone</h2>
+          <DangerZone />
+        </section>
 
       </div>
     </div>

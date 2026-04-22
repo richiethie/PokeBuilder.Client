@@ -1,4 +1,4 @@
-import { LogIn, LogOut, User, ChevronDown, Users, LifeBuoy } from "lucide-react";
+import { LogIn, LogOut, User, ChevronDown, Users, LifeBuoy, House } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -51,11 +51,15 @@ export function AppHeader() {
                   <p className="text-sm font-medium">@{user.username}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/")} className="gap-2">
+                  <House className="h-4 w-4" />
+                  Home
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2">
                   <User className="h-4 w-4" />
                   My Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/profile?tab=teams")} className="gap-2">
+                <DropdownMenuItem onClick={() => navigate("/teams")} className="gap-2">
                   <Users className="h-4 w-4" />
                   Saved Teams
                 </DropdownMenuItem>

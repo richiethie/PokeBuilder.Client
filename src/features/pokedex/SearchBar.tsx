@@ -23,6 +23,11 @@ export function SearchBar() {
     setTypeFilter("all");
   }
 
+  const selectedTypeLabel =
+    typeFilter === "all"
+      ? "All Types"
+      : `${typeFilter.charAt(0).toUpperCase()}${typeFilter.slice(1)}`;
+
   return (
     <div className="flex gap-2">
       <div className="relative flex-1">
@@ -40,7 +45,7 @@ export function SearchBar() {
         onValueChange={(val) => setTypeFilter(val as FilterType)}
       >
         <SelectTrigger className="w-32 shrink-0">
-          <SelectValue placeholder="Type" />
+          <SelectValue>{selectedTypeLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Types</SelectItem>

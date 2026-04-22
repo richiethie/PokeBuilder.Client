@@ -14,8 +14,10 @@ import { WelcomeHero } from "@/features/welcome/WelcomeHero";
 import { PokemonDetailsPage } from "@/pages/PokemonDetailsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { SavedTeamPage } from "@/pages/SavedTeamPage";
+import { SavedTeamsPage } from "@/pages/SavedTeamsPage";
 import { HelpFeedbackPage } from "@/pages/HelpFeedbackPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { FULL_POKEDEX_KEY } from "@/context/AppContext";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +28,11 @@ interface EditTeamState {
   name: string;
 }
 
+interface EditFavoriteTeamState {
+  gameKey: string;
+  pokemonIds: (number | null)[];
+}
+
 function MainPage() {
   const { selectedGame, isHydrating, selectGame, setActiveSavedTeam, setTeamSheetOpen } = useAppContext();
   const location = useLocation();
@@ -34,7 +41,9 @@ function MainPage() {
   // When navigating here from a saved-team edit button, hydrate the team builder
   useEffect(() => {
     if (editHandled.current || isHydrating) return;
-    const editTeam = (location.state as { editTeam?: EditTeamState } | null)?.editTeam;
+    const state = location.state as { editTeam?: EditTeamState; editFavoriteTeam?: EditFavoriteTeamState } | null;
+    const editTeam = state?.editTeam;
+    const editFavoriteTeam = state?.editFavoriteTeam;
     if (editTeam?.gameKey && Array.isArray(editTeam.pokemonIds) && editTeam.id) {
       editHandled.current = true;
       window.history.replaceState({}, document.title);
@@ -46,6 +55,20 @@ function MainPage() {
           originalName: editTeam.name,
           originalPokemonIds: editTeam.pokemonIds,
         });
+        setTeamSheetOpen(true);
+      })();
+      return;
+    }
+
+    if (
+      editFavoriteTeam?.gameKey === FULL_POKEDEX_KEY &&
+      Array.isArray(editFavoriteTeam.pokemonIds)
+    ) {
+      editHandled.current = true;
+      window.history.replaceState({}, document.title);
+      void (async () => {
+        await selectGame(FULL_POKEDEX_KEY, false, editFavoriteTeam.pokemonIds);
+        setActiveSavedTeam(null);
         setTeamSheetOpen(true);
       })();
     }
@@ -117,6 +140,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<MainPage />} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/teams" element={<ProtectedRoute><SavedTeamsPage /></ProtectedRoute>} />
+            <Route path="/teams/:id" element={<ProtectedRoute><SavedTeamPage /></ProtectedRoute>} />
             <Route path="/profile/teams/:id" element={<ProtectedRoute><SavedTeamPage /></ProtectedRoute>} />
             <Route path="/help-feedback" element={<ProtectedRoute><HelpFeedbackPage /></ProtectedRoute>} />
             <Route path="/:game/:pokemon" element={<PokemonDetailsPage />} />

@@ -13,6 +13,34 @@ import { gamesService } from "@/lib/api";
 import { storage } from "@/lib/storage";
 
 const MAX_TEAM_SIZE = 6;
+export const FULL_POKEDEX_KEY = "fullpokedex";
+
+const FULL_POKEDEX_GAME: Game = {
+  key: FULL_POKEDEX_KEY,
+  name: "Full Pokédex",
+  generation: 0,
+};
+
+async function loadFullDex(allGames: Game[]): Promise<Pokemon[]> {
+  const allDexes = await Promise.all(
+    allGames.map((game) => gamesService.getDex(game.key))
+  );
+
+  const byId = new Map<number, Pokemon>();
+  for (const dex of allDexes) {
+    for (const pokemon of dex) {
+      if (!byId.has(pokemon.id)) {
+        byId.set(pokemon.id, {
+          ...pokemon,
+          // In full view we want National order/numbering.
+          dexNumber: pokemon.id,
+        });
+      }
+    }
+  }
+
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
 
 export interface ActiveSavedTeam {
   id: string;
@@ -113,12 +141,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         const cached = gamesRef.current;
-        const [allGames, dex] = await Promise.all([
-          cached.length > 0 ? Promise.resolve(cached) : gamesService.getGames(),
-          gamesService.getDex(key),
-        ]);
+        const allGames =
+          cached.length > 0 ? cached : await gamesService.getGames();
 
-        const game = allGames.find((g) => g.key === key) ?? null;
+        const game =
+          key === FULL_POKEDEX_KEY
+            ? FULL_POKEDEX_GAME
+            : (allGames.find((g) => g.key === key) ?? null);
+        const dex =
+          key === FULL_POKEDEX_KEY
+            ? await loadFullDex(allGames)
+            : await gamesService.getDex(key);
         setSelectedGame(game);
 
         if (cached.length === 0 && allGames.length > 0) {
@@ -163,10 +196,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const savedKey = storage.getGame();
         if (savedKey) {
-          const dex = await gamesService.getDex(savedKey);
+          const dex =
+            savedKey === FULL_POKEDEX_KEY
+              ? await loadFullDex(allGames)
+              : await gamesService.getDex(savedKey);
           if (cancelled) return;
 
-          const game = allGames.find((g) => g.key === savedKey) ?? null;
+          const game =
+            savedKey === FULL_POKEDEX_KEY
+              ? FULL_POKEDEX_GAME
+              : (allGames.find((g) => g.key === savedKey) ?? null);
           setSelectedGame(game);
           setDexPokemon(dex);
 

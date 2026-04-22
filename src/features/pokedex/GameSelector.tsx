@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppContext } from "@/context/AppContext";
+import { FULL_POKEDEX_KEY, useAppContext } from "@/context/AppContext";
 import type { Game } from "@/types";
 import { getPokemonImageUrl } from "@/lib/pokemon";
 
@@ -115,6 +115,11 @@ export function GameSelector() {
           <SelectValue placeholder="Choose a Pokémon game…" />
         </SelectTrigger>
         <SelectContent position="popper" align="start">
+          <SelectGroup>
+            <SelectLabel>Special</SelectLabel>
+            <SelectItem value={FULL_POKEDEX_KEY}>Full Pokédex</SelectItem>
+            <SelectSeparator />
+          </SelectGroup>
           {generationOrder.map((generation, generationIndex) => (
             <SelectGroup key={generation}>
               <SelectLabel>{getGenerationLabel(generation)}</SelectLabel>
