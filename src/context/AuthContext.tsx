@@ -9,7 +9,10 @@ import {
 import type { User, AuthTab } from "@/types";
 import {
   setAuthToken,
+  setRefreshToken,
   getAuthToken,
+  getRefreshToken,
+  clearAuthSession,
   registerUnauthorizedHandler,
   authService,
 } from "@/lib/api";
@@ -62,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {
-      setAuthToken(null);
+      clearAuthSession();
       setUser(null);
       openAuthModal("signin");
     });
@@ -71,8 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (emailOrUsername: string, password: string) => {
     setIsAuthLoading(true);
     try {
-      const { token, user: apiUser } = await authService.login({ emailOrUsername, password });
+      const { token, refreshToken, user: apiUser } = await authService.login({ emailOrUsername, password });
       setAuthToken(token);
+      setRefreshToken(refreshToken ?? null);
       setUser(apiUser);
       setAuthModalOpen(false);
     } finally {
@@ -83,8 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (username: string, email: string, password: string) => {
     setIsAuthLoading(true);
     try {
-      const { token, user: apiUser } = await authService.register({ username, email, password });
+      const { token, refreshToken, user: apiUser } = await authService.register({ username, email, password });
       setAuthToken(token);
+      setRefreshToken(refreshToken ?? null);
       setUser(apiUser);
       setAuthModalOpen(false);
     } finally {
@@ -93,12 +98,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    setAuthToken(null);
+    const token = getRefreshToken();
+    if (token) {
+      void authService.logout({ refreshToken: token }).catch(() => undefined);
+    }
+    clearAuthSession();
     setUser(null);
   }, []);
 
   const applyAuthResponse = useCallback((response: AuthResponse) => {
     setAuthToken(response.token);
+    if (response.refreshToken) setRefreshToken(response.refreshToken);
     setUser(response.user);
   }, []);
 

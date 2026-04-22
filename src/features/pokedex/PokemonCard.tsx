@@ -1,4 +1,4 @@
-import { Plus, Check } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,12 @@ interface PokemonCardProps {
 
 export function PokemonCard({ pokemon }: PokemonCardProps) {
   const navigate = useNavigate();
-  const { addToTeam, isOnTeam, team, selectedGame } = useAppContext();
+  const { addToTeam, removeFromTeam, isOnTeam, team, selectedGame } = useAppContext();
 
   const onTeam = isOnTeam(pokemon.id);
+  const teamSlotIndex = team.findIndex((slot) => slot?.id === pokemon.id);
   const teamFull = team.every((slot) => slot !== null);
-  const disabled = onTeam || teamFull;
+  const disabled = !onTeam && teamFull;
 
   function handleCardClick() {
     if (selectedGame) {
@@ -77,18 +78,22 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
       {/* Add button — stopPropagation so it doesn't also navigate */}
       <Button
         size="icon"
-        variant={onTeam ? "secondary" : "default"}
+        variant={onTeam ? "destructive" : "default"}
         className="h-8 w-8 shrink-0"
         onClick={(e) => {
           e.stopPropagation();
+          if (onTeam && teamSlotIndex !== -1) {
+            removeFromTeam(teamSlotIndex);
+            return;
+          }
           addToTeam(pokemon);
         }}
         disabled={disabled}
         title={
-          onTeam ? "Already on team" : teamFull ? "Team is full" : `Add ${pokemon.name}`
+          onTeam ? `Remove ${pokemon.name}` : teamFull ? "Team is full" : `Add ${pokemon.name}`
         }
       >
-        {onTeam ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+        {onTeam ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
       </Button>
     </div>
   );

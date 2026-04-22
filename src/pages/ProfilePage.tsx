@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, User, Users, Shield, Trash2, Loader2, Check } from "lucide-react";
 import type { User as UserType } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -436,9 +436,12 @@ function DangerZone() {
 export function ProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // ProtectedRoute guarantees user is non-null by the time this renders.
   const currentUser = user as UserType;
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab = tabFromUrl === "teams" || tabFromUrl === "security" ? tabFromUrl : "profile";
 
   return (
     <div className="min-h-screen bg-background">
@@ -467,7 +470,12 @@ export function ProfilePage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="profile">
+        <Tabs
+          value={activeTab}
+          onValueChange={(next) => {
+            setSearchParams(next === "profile" ? {} : { tab: next }, { replace: true });
+          }}
+        >
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="profile" className="gap-1.5">
               <User className="h-3.5 w-3.5" />

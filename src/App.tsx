@@ -14,6 +14,7 @@ import { WelcomeHero } from "@/features/welcome/WelcomeHero";
 import { PokemonDetailsPage } from "@/pages/PokemonDetailsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { SavedTeamPage } from "@/pages/SavedTeamPage";
+import { HelpFeedbackPage } from "@/pages/HelpFeedbackPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -27,7 +28,6 @@ interface EditTeamState {
 
 function MainPage() {
   const { selectedGame, isHydrating, selectGame, setActiveSavedTeam, setTeamSheetOpen } = useAppContext();
-  const { isAuthHydrating } = useAuth();
   const location = useLocation();
   const editHandled = useRef(false);
 
@@ -50,26 +50,6 @@ function MainPage() {
       })();
     }
   }, [isHydrating, location.state, selectGame, setActiveSavedTeam, setTeamSheetOpen]);
-
-  const loading = isHydrating || isAuthHydrating;
-
-  // Remove the HTML splash screen once both contexts are done hydrating AND
-  // the browser has painted the full UI beneath it.
-  useEffect(() => {
-    if (loading) return;
-    // Wait two animation frames: the first lets React commit the DOM,
-    // the second ensures the browser has actually painted pixels.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const splash = document.getElementById("app-splash");
-        if (splash) {
-          splash.style.transition = "opacity 400ms ease";
-          splash.style.opacity = "0";
-          setTimeout(() => splash.remove(), 400);
-        }
-      });
-    });
-  }, [loading]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -106,15 +86,39 @@ function MainPage() {
   );
 }
 
+function SplashDismissOnHydration() {
+  const { isHydrating } = useAppContext();
+  const { isAuthHydrating } = useAuth();
+  const loading = isHydrating || isAuthHydrating;
+
+  useEffect(() => {
+    if (loading) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const splash = document.getElementById("app-splash");
+        if (splash) {
+          splash.style.transition = "opacity 400ms ease";
+          splash.style.opacity = "0";
+          setTimeout(() => splash.remove(), 400);
+        }
+      });
+    });
+  }, [loading]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
+          <SplashDismissOnHydration />
           <Routes>
             <Route path="/" element={<MainPage />} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/profile/teams/:id" element={<ProtectedRoute><SavedTeamPage /></ProtectedRoute>} />
+            <Route path="/help-feedback" element={<ProtectedRoute><HelpFeedbackPage /></ProtectedRoute>} />
             <Route path="/:game/:pokemon" element={<PokemonDetailsPage />} />
           </Routes>
           {/* Auth modal lives at root so it can be opened from anywhere */}

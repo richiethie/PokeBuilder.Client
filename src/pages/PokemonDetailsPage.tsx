@@ -59,13 +59,17 @@ function NotFoundPage({ message }: { message: string }) {
 }
 
 function AcquisitionSection({ details }: { details: PokemonDetailGameInfo }) {
+  const methods = details.obtainMethods.filter(
+    (method): method is ObtainMethod => method in OBTAIN_META
+  );
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold">How to Get</h2>
 
       {/* Method badges */}
       <div className="flex flex-wrap gap-2">
-        {details.obtainMethods.map((method) => {
+        {methods.map((method) => {
           const { label, Icon, color } = OBTAIN_META[method];
           return (
             <span

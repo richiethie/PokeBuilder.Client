@@ -1,4 +1,4 @@
-import { Sword, LogIn, LogOut, User, ChevronDown } from "lucide-react";
+import { LogIn, LogOut, User, ChevronDown, Users, LifeBuoy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,8 +26,7 @@ export function AppHeader() {
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <Sword className="h-5 w-5 text-primary" />
-          <span className="text-lg font-bold tracking-tight">PokéBuilder</span>
+          <span className="app-title text-lg font-normal uppercase">PokéBuilder</span>
         </div>
 
         {/* Auth controls */}
@@ -50,12 +49,22 @@ export function AppHeader() {
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel className="font-normal">
                   <p className="text-sm font-medium">@{user.username}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2">
                   <User className="h-4 w-4" />
                   My Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/profile?tab=teams")} className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Saved Teams
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/help-feedback")}
+                  className="gap-2"
+                >
+                  <LifeBuoy className="h-4 w-4" />
+                  Help & Feedback
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="gap-2 text-destructive focus:text-destructive">

@@ -1,5 +1,4 @@
 import { apiClient } from "./client";
-import type { User } from "@/types";
 import type { AuthResponse } from "./auth.service";
 
 export interface UpdateProfileRequest {
